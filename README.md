@@ -1,5 +1,5 @@
-# Research Project: Analyzing the tidally disrupting dwarf galaxy Bootes 
-III
+# Research Project: Analyzing the tidally disrupting dwarf galaxy Bootes III
+
 This collection of Python notebooks and data files summarize my work in 
 the astrophysics research course AST425 so far. Following the notebooks, 
 the key findings and plots should be reproduced.
@@ -27,6 +27,8 @@ guide, with the aim of
 finding tidal tail features.
 
 ## Python packages
+For orbit and stream modelling, we use 
+[galpy](https://docs.galpy.org/en/v1.8.1/index.html)
 
 ## Data
 
