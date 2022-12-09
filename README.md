@@ -1,8 +1,20 @@
 # Research Project: Analyzing the tidally disrupting dwarf galaxy Bootes III
 
-This collection of Python notebooks and data files summarize my work in 
-the astrophysics research course AST425 so far. Following the notebooks, 
-the key findings and plots should be reproduced.
+This is a repository for my work in AST425, the astrophysics research course at 
+U of T. My project is to study the dwarf galaxy Bootes III. Specifically, I 
+find member stars and updated physical parameters of this galaxy, and use the
+paramaters to run simulations for orbit and stream. The simulations are then 
+compared with observation data on known streams that are postulated to be
+associated with Bootes III (in particular, Styx stream and Typhon stream). My
+project supervisor is Prof. Ting Li.
+
+Relevant papers:\
+[Boötes III is a Disrupting Dwarf Galaxy Associated with the Styx Stellar Stream](https://iopscience.iop.org/article/10.3847/1538-4357/aad8c1)\
+[Four new stellar debris streams in the galactic halo](https://iopscience.iop.org/article/10.1088/0004-637X/693/2/1118)
+
+The collection of Python notebooks and data files summarize my work so far. 
+Although the data files are not uploaded to this repository, the notebooks
+themselves contain code for the whole analysis procedure.
 
 (README is not complete!)
 
