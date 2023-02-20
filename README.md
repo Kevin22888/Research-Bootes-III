@@ -1,12 +1,16 @@
 # Research Project: Analyzing the tidally disrupting dwarf galaxy Bootes III
 
 This is a repository for my work in AST425, the astrophysics research course at 
-U of T. My project is to study the dwarf galaxy Bootes III. Specifically, I 
-find member stars and updated physical parameters of this galaxy, and use the
-paramaters to run simulations for orbit and stream. The simulations are then 
-compared with observation data on known streams that are postulated to be
-associated with Bootes III (in particular, Styx stream and Typhon stream). My
-project supervisor is Prof. Ting Li.
+U of T. My project is to study the dwarf galaxy Bootes III. The analysis is divided 
+into the following parts: 
+1. Identify member stars of Bootes III and measure its physical parameters
+2. Orbit integration and tidal stream simulation of Bootes III. Particularly, we investigate 
+the effects on the model result when we add the LMC into the Galactic potential model.
+3. A further search of Bootes III members using the tidal stream model as a guide. For this
+part, we want to search for tidal disruption features of Bootes III.
+4. Compare with observation data on known streams that are postulated to be associated 
+with Bootes III (in particular, Styx stream and Typhon stream). 
+My project supervisor is Prof. Ting Li.
 
 Relevant papers:\
 [Boötes III is a Disrupting Dwarf Galaxy Associated with the Styx Stellar Stream](https://iopscience.iop.org/article/10.3847/1538-4357/aad8c1)\
