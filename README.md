@@ -23,24 +23,13 @@ themselves contain code for the whole analysis procedure.
 (README is not complete!)
 
 ## Table of Contents
-* [Project outline](#project-outline)
+* [Outline](#outline)
 * [Python packages](#python-packages)
 * [Data](#data)
 * [Additional notebooks](#additional)
 
-## Project outline
-The main Jupyter notebooks are separated into many parts, each covering 
-a different stage of the analysis of Bootes III (Boo III). We find member 
-stars of Boo III and use the members to compute kinematics and metallicity 
-parameters of Boo III in Part 1. We then use the parameters to simulate 
-the orbit of Boo III in Part 2. We also simulate a stellar stream 
-given Boo 
-III kinematics. These are compared with known stellar streams that are 
-suspected to be associated with Boo III. In Part 3, we search for more 
-member stars in a larger area from the centre of Boo III, using our stream 
-simulation as a 
-guide, with the aim of 
-finding tidal tail features.
+## Outline
+The folder `main-notebooks` contains the Jupyter notebooks that accomplish the analysis tasks. Inside the folder, `Bootes III Part 1.ipynb` is about member identification and calculation of parameters. `Bootes III Part 2.ipynb` does the orbital integration and stream simulation (This includes all the figures about orbit and stream). `Bootes III Part 3.ipynb` searches for tidal tail features using Gaia DR3 catalogue, and uses the stream model from Part 2 as a reference. Additionally, the file `analysis_functions_v2.py` has custom functions for data reduction and analysis (such as proper motion data cutting and CMD filtering), and "plot_functions.py" is just a collection of helper functions that make plotting easier. These are required for the main notebooks to run successfully.
 
 ## Python packages
 For orbit and stream modelling, we use 
