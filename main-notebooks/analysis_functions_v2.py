@@ -41,53 +41,81 @@ def dm_to_distance(dm):
     return 10**(dm / 5) * 10
 
 def poly_2deg(x, a, b, c):
-    """A quadratic equation for fitting some data. In our case, 
+    """A quadratic equation for fitting some data. 
     """
     y = a * x**2 + b * x + c
     
     return y
 
-def pm_cut_with_gradient(table0, p_opt_pmra, p_opt_pmdec, pad=0):
-    """This function makes member selection/filter based on the ellipse from covariance matrix,
-    along with a mean PM center that varies with RA.
+def pm_cut_with_gradient(table_data, pmra_curve_params, pmdec_curve_params, pad=0):
+    """Return an astropy table with selected stars from <table_data>, taking into
+    account proper motion gradients along both RA and Dec directions. Each gradient is
+    described by a polynomial curve, where <pmra_curve_params> and <pmdec_curve_params>
+    contain the coefficients for the polynomial curves.
+    
+    The selection procedure is the following:
+    - Take a star in <table_data>, use its pmra_error, pmdec_error, and pmra_pmdec_corr
+    to create a covariance matrix. Then use the matrix to find semi-major and semi-minor 
+    axes of the covariance matrix ellipse, and use shapelyPolygon to create the ellipse.
+    - Take this star's RA coordinate, combined with coefficients given in <pmra_curve_params>
+    and <pmdec_curve_params>, and input these into the quadratic function poly_2deg, from
+    which we will obtain a pair of (pmra, pmdec) coordinates. This is the predicted location
+    of this star in the proper motion space.
+    - If the ellipse contains this predicted point, add it to the table of selected stars.
+    Otherwise, move to the next star in <table_data>.
     
     Parameters
     ----------
-    table0 : data table, ra of each star will be examined
-    pmra0 : mean PM, from best fit of base sample
-    pmdec0 : refer to above
-    pad : added in quadrature with the PM errors on each star, to increase ellipse size
-    p_opt_pmra : polynomial coefficients from curve fitting the model pmra vs. ra
-    p_opt_pmdec : refer to above
+    table_data: 
+        An astropy table containing information about stars
+    pad: 
+        A value to increase the ellipse size. Added in quadrature with the PM errors on
+        each star.
+    pmra_curve_params: 
+        polynomial coefficients for the function poly_2deg, 
+        for the model curve in PMRA vs. RA
+    pmdec_curve_params:
+        polynomial coefficients for the function poly_2deg, 
+        for the model curve in PMDEC vs. RA
     
-    (table0 should include the following columns: pmra, pmdec, pmra_error, pmdec_error, pmra_pmdec_corr)
+    Precondition
+    ------------
+    table_data should include the following column names: 
+    pmra, pmdec, pmra_error, pmdec_error, pmra_pmdec_corr
     
     Return
     ------
-    a new data table with selected members
+    A new astropy table with selected members.
     """    
-    selected = table.Table()
+    selected_stars = table.Table()
+    selected_stars.columns = table_data.columns
+    selected_stars.remove_rows(slice(0, len(selected_stars), 1))
     
-    for i in range(len(table0)):
+    # For parametrizing the ellipse later
+    t = np.arange(0, 2*np.pi, 0.01)
+
+    for i in range(len(table_data)):
         #--- CREATE ELLIPSE ---#
         
         # adding the pad to pm error
-        pmra_sigma_i = np.sqrt(table0['pmra_error'][i]**2 + pad**2) 
-        pmdec_sigma_i = np.sqrt(table0['pmdec_error'][i]**2 + pad**2)
+        pmra_sigma_i = np.sqrt(table_data['pmra_error'][i]**2 + pad**2) 
+        pmdec_sigma_i = np.sqrt(table_data['pmdec_error'][i]**2 + pad**2)
         
         # covariance matrix entries
         var_x = pmra_sigma_i**2
         var_y = pmdec_sigma_i**2
-        cov_xy = table0['pmra_pmdec_corr'][i] * pmra_sigma_i * pmdec_sigma_i
+        cov_xy = table_data['pmra_pmdec_corr'][i] * pmra_sigma_i * pmdec_sigma_i
 
+        # Creating the matrix for better understanding
         cov_matrix = np.array([[var_x, cov_xy], 
                                [cov_xy, var_y]])
-        a, c = np.diag(cov_matrix)
+        a = cov_matrix[0, 0]
+        c = cov_matrix[1, 1]
         b = cov_matrix[0, 1]
 
+        # The sqrt of the lambdas are the semi-major and semi-minor axes
         lambda1 = (a+c)/2 + np.sqrt(((a-c)/2)**2 + b**2)
         lambda2 = (a+c)/2 - np.sqrt(((a-c)/2)**2 + b**2)
-        # The sqrt of these lambdas would be the semi-major and semi-minor axes
 
         if b == 0 and a >= c:
             theta = 0
@@ -96,27 +124,27 @@ def pm_cut_with_gradient(table0, p_opt_pmra, p_opt_pmdec, pad=0):
         else:
             theta = np.arctan2(lambda1 - a, b)
 
-        t = np.arange(0, 2*np.pi, 0.01)
-
-        x_t = lambda1**0.5 * np.cos(theta) * np.cos(t) - lambda2**0.5 * np.sin(theta) * np.sin(t) + table0['pmra'][i]
-        y_t = lambda1**0.5 * np.sin(theta) * np.cos(t) + lambda2**0.5 * np.cos(theta) * np.sin(t) + table0['pmdec'][i]
-        
-        # Make start and end points the same values
-        x_t = np.append(x_t, x_t[0])
-        y_t = np.append(y_t, y_t[0])
+        x_t = np.zeros(len(t) + 1)
+        y_t = np.zeros(len(t) + 1)
+        x_t[:-1] = lambda1**0.5 * np.cos(theta) * np.cos(t) - lambda2**0.5 * np.sin(theta) * np.sin(t) + table_data['pmra'][i]
+        y_t[:-1] = lambda1**0.5 * np.sin(theta) * np.cos(t) + lambda2**0.5 * np.cos(theta) * np.sin(t) + table_data['pmdec'][i]
+        # Make a closed shape to create a polygon
+        x_t[-1] = x_t[0]
+        y_t[-1] = y_t[0]
 
         ellipse = shapelyPolygon(np.array([x_t, y_t]).T)
         
         #--- EXPECTED PM CENTER FROM RA ---#
-        pmra_expected = poly_2deg(table0['ra'][i], *p_opt_pmra)
-        pmdec_expected = poly_2deg(table0['ra'][i], *p_opt_pmdec)
+        pmra_expected = poly_2deg(table_data['ra'][i], *pmra_curve_params)
+        pmdec_expected = poly_2deg(table_data['ra'][i], *pmdec_curve_params)
 
         pm_center = shapelyPoint(pmra_expected, pmdec_expected)
         
+        #--- CHECKING FOR SELECTION ---#
         if ellipse.contains(pm_center):
-            selected = table.vstack([selected, table0[i]])
+            selected_stars.add_row(table_data[i])
     
-    return selected
+    return selected_stars
 
 
 #------------------------ Specific functions for my analysis ------------------------#
@@ -343,17 +371,24 @@ def color_color_cut(data_table, stellar_locus, y_shift_top, y_shift_bottom=0, ge
 
 def plot_rh(ax):
     """A convenient function to plot the half-light radius for BooIII (1, 3, and 5 times).
+    
+    Values taken from https://iopscience.iop.org/article/10.3847/1538-4357/ab7459
     """
     RA_BOO3, DEC_BOO3 = 209.3, 26.8
     
-    rh = 33.03 / 60 # Literature value for half light radius is 33.03 arcmin
-    PA = 278.91
-    ell = 0.33
+    # In Moskowitz & Walker, the presented radius is "circularized".
+    # Its relation with the elliptical radius (semi-major axis) is:
+    # R_circ = R_elliptical * sqrt(1 - e), in units of arcmin
+    rh_elliptical = 33.03 / (1 - 0.33)**0.5  
+    
+    rh = rh_elliptical / 60  # Half-light radius [deg]
+    PA = 278.91              # Position Angle [deg]
+    ell = 0.33               # Ellipticity
 
     ells = Ellipse(xy=(RA_BOO3, DEC_BOO3), 
                    width=2*rh, 
                    height=2*rh*(1-ell),
-                   angle=90-PA, fc=None, ec='k', ls='--', lw=2, fill=False, label='BooIII $r_h$, 3$r_h$, 5$r_h$') 
+                   angle=90-PA, fc=None, ec='k', ls='--', lw=2, fill=False, label='$r_h$, 3$r_h$, 5$r_h$') 
     ells2 = Ellipse(xy=(RA_BOO3, DEC_BOO3), 
                    width=6*rh, 
                    height=6*rh*(1-ell),
@@ -367,9 +402,90 @@ def plot_rh(ax):
     ax.add_artist(ells2)
     ax.add_artist(ells3)
     
+    
+def add_delta_coordinates(table, center):
+    """
+    Modify the input <table> by adding the columns "ra_delta" and "dec_delta" (in degrees).
+    These are the original coordinates shifted to the axes where (0, 0) is the
+    center of the target galaxy.
+    
+    <table> should contain the (RA, Dec) coordinates in degrees.
+    <center> is the (RA, Dec) of the target galaxy, also in degrees.
+    """
+    ra0 = np.radians(center[0])
+    dec0 = np.radians(center[1])
+    ra = np.radians(table['ra'])
+    dec = np.radians(table['dec'])
+    
+    ra_delta_rad = np.cos(dec) * np.sin(ra - ra0)
+    dec_delta_rad = np.sin(dec) * np.cos(dec0) - np.cos(dec) * np.sin(dec0) * np.cos(ra - ra0)
+    
+    table['ra_delta'] = np.degrees(ra_delta_rad)
+    table['dec_delta'] = np.degrees(dec_delta_rad)
+    
+    
+def radius_cut_with_delta_coords(table, radius):
+    """Input table must have the "delta" celestial coordinates 
+    obtained from add_delta_coordinates().
+    """
+    r = np.sqrt(table['ra_delta']**2 + table['dec_delta']**2)
+    return table[r < radius]
+
+
+def half_light_radius_cut_along_semimajor_axis(table, position_angle, ellipticity, radius):
+    """Note radius may be multiples of the half-light radius.
+    """
+    q = 1 - ellipticity
+    angle = np.radians(90 - position_angle)
+    
+    # Rotate to align with semi-major axis
+    ra_delta_rotated = table['ra_delta'] * np.cos(angle) + table['dec_delta'] * np.sin(angle)
+    dec_delta_rotated = - table['ra_delta'] * np.sin(angle) + table['dec_delta'] * np.cos(angle)
+    
+    # Elliptical radius of all stars
+    r_elliptical = np.sqrt(ra_delta_rotated**2 + dec_delta_rotated**2 / q**2)
+    
+    return table[r_elliptical < radius]
+
+
+def plot_rh_projected(ax):
+    """This is an alternative version of plot_rh(), which plots the radius with respect to
+    delta RA and delta Dec, with the centre at (RA, Dec) = (0, 0).
+    
+    A convenient function to plot the half-light radius for BooIII (1, 3, and 5 times).
+    Values taken from https://iopscience.iop.org/article/10.3847/1538-4357/ab7459
+    """    
+    # In Moskowitz & Walker, the presented radius is "circularized".
+    # Its relation with the elliptical radius (semi-major axis) is:
+    # R_circ = R_elliptical * sqrt(1 - e), in units of arcmin
+    rh_elliptical = 33.03 / (1 - 0.33)**0.5  
+    
+    rh = rh_elliptical / 60  # Half-light radius [deg]
+    PA = 278.91              # Position Angle [deg]
+    ell = 0.33               # Ellipticity
+
+    ells = Ellipse(xy=(0, 0), 
+                   width=2*rh, 
+                   height=2*rh*(1-ell),
+                   angle=90-PA, fc=None, ec='k', ls='--', lw=2, fill=False, label='$r_h$, 3$r_h$, 5$r_h$') 
+    ells2 = Ellipse(xy=(0, 0), 
+                   width=6*rh, 
+                   height=6*rh*(1-ell),
+                   angle=90-PA, fc=None, ec='k', ls='--', lw=2, fill=False) 
+    ells3 = Ellipse(xy=(0, 0), 
+                   width=10*rh, 
+                   height=10*rh*(1-ell),
+                   angle=90-PA, fc=None, ec='k', ls='--', lw=2, fill=False)
+
+    ax.add_artist(ells)
+    ax.add_artist(ells2)
+    ax.add_artist(ells3)
+    
+    
 # ------------------------------------------------------- #
 # ----------This is for computing RRL distance----------- #
 # ------------------------------------------------------- #
+
 # extinction correction
 import getDust # Compute the Gaia extinctions assuming relations from Babusieux (Gaia Collaboration et al. (2018))
 
@@ -385,7 +501,10 @@ def add_dm_to_RRLs(table, feh_mean):
     the mean [Fe/H] of the sample.
     """
     # input: Gaia G, BP, RP, output: extinction in each band
-    table['AG'], table['Abp'], table['Arp'] = getDust.getDust(table['phot_g_mean_mag'], table['phot_bp_mean_mag'], table['phot_rp_mean_mag'], 0.86*table['EBV_SFD'])
+    table['AG'], table['Abp'], table['Arp'] = getDust.getDust(table['phot_g_mean_mag'],
+                                                              table['phot_bp_mean_mag'],
+                                                              table['phot_rp_mean_mag'],
+                                                              0.86*table['EBV_SFD'])
 
     # distance calibration from Muraveva et al. (2018)
     # (Assume the given RRLs have metallicity from our MCMC fit of the base sample)
@@ -394,30 +513,6 @@ def add_dm_to_RRLs(table, feh_mean):
     # get dm from G, MG and extinction
     table['dm'] = table['phot_g_mean_mag'] - table['AG'] - table['MG']
 # ------------------------------------------------------- #
-    
-def get_Orbit_properties(orbit_obj, as_percentiles=True):
-    """Return pericenter, apocenter, and eccentricity from orbit_obj. 
-    (Must be a galpy orbit object)
-    
-    If as_percentiles, return upper and lower errors calculated
-    from 16, 50, 84 percentiles. A total of 9 outputs.
-    
-    If not as_percentiles, return error as the average
-    of the upper and lower errors.
-    """
-    peri_16, peri_50, peri_84 = np.percentile(orbit_obj.rperi(), [16, 50, 84])
-    apo_16, apo_50, apo_84 = np.percentile(orbit_obj.rap(), [16, 50, 84])
-    ecc_16, ecc_50, ecc_84 = np.percentile(orbit_obj.e(), [16, 50, 84])
-
-    if as_percentiles:
-        return peri_50, peri_16 - peri_50, peri_84 - peri_50, \
-                apo_50, apo_16 - apo_50, apo_84 - apo_50, \
-                ecc_50, ecc_16 - ecc_50, ecc_84 - ecc_50
-    else:
-        peri_err = (peri_84 - peri_16)/2        
-        apo_err = (apo_84 - apo_16)/2        
-        e_err = (e_84 - e_16)/2
-        return peri_50, peri_err, apo_50, apo_err, ecc_50, e_err
     
     
    
