@@ -1,8 +1,7 @@
 # Analysis of the dwarf galaxy Bootes III: a system likely undergoing tidal disruption
 
 This is a repository for my work in AST425, the astrophysics research course at 
-U of T. My project supervisor is Professor Ting Li. My project is to analysis the 
-dwarf galaxy Bootes III, a system speculated to be experiencing tidal disruption.
+U of T. My supervisor is Professor Ting Li.
 
 The analysis is divided into the following parts: 
 1. Finding member stars of Bootes III. Calculating its systemic parameters.
